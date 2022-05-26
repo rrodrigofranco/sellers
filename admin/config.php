@@ -37,6 +37,16 @@
 </style>
 
 <script>
+    function updateButton() {
+        aux = jQuery(".tablinks");
+        for (let i = 0; i < aux.size(); i++) {
+            if (aux[i].className == 'tablinks active') {
+                aux[i].click();
+                i = jQuery(".tablinks").size();
+            }
+        }
+    }
+
     function openSeller(evt, Status) {
         // Declare all variables
         var i, tabcontent, tablinks;
@@ -54,13 +64,39 @@
         }
 
         // Show the current tab, and add an "active" class to the button that opened the tab
+        if (document.getElementById("products").checked) {
+            Status = Status + 'Products';
+        }
+
         document.getElementById(Status).style.display = "block";
         evt.currentTarget.className += " active";
+    }
+    window.onload = (event) => {
+        jQuery('input[type=radio][name=sellers]').change(() => {
+            jQuery("input:radio[name=products]:checked")[0].checked = false;
+            updateButton();
+        });
+
+        jQuery('input[type=radio][name=products]').change(() => {
+            jQuery("input:radio[name=sellers]:checked")[0].checked = false;
+            updateButton();
+        });
     }
 </script>
 <div class="wrap">
     <h2>Analisando os Sellers</h2>
 </div>
+<form>
+    <input type="radio" name="sellers" id="sellers" checked>
+    <label for="sellers">
+        Sellers       
+    </label>
+    <input type="radio" name="products" id="products">
+    <label for="products">
+        Products
+    </label>
+</form>
+
 
 <!-- Tab links -->
 <div class="tab">
@@ -71,11 +107,14 @@
 <?php
 
 $vendors = get_users(array('role__in' => array('author', 'seller'))); //Get only the Sellers
+global $wpdb;
 ?>
+
 <!-- Tab content -->
 <div id="All" class="tabcontent">
     <h3>All</h3>
     <?php
+
     foreach ($vendors as $user) {
         if (has_product($user->id)) {
             $produtos = 'ATIVO';
@@ -84,6 +123,24 @@ $vendors = get_users(array('role__in' => array('author', 'seller'))); //Get only
         }
     ?>
         <p><a href="<? echo get_home_url() ?>/wp-admin/edit.php?post_type=product&author=<?php echo $user->id ?>" target="_blank"><?php echo esc_html($user->display_name) ?></a> -> <?php echo $produtos ?> <br></p>
+    <?php
+    }
+    ?>
+</div>
+
+<div id="AllProducts" class="tabcontent">
+    <h3>All</h3>
+    <?php
+    $all_product_data = $wpdb->get_results("SELECT ID,post_title,post_content,post_author,post_date_gmt FROM `" . $wpdb->prefix . "posts` where post_type='product' and post_status = 'publish'");
+    foreach ($all_product_data as $produto) {
+        $url = get_permalink($produto->ID);
+        if (my_units_sold_count($produto->ID)) {
+            $produtos = 'ATIVO';
+        } else {
+            $produtos = 'INATIVO';
+        }
+    ?>
+        <p><a href="<?php echo $url ?>" target="_blank"><?php echo esc_html($produto->post_title) ?></a> -> <?php echo $produtos ?> <br></p>
     <?php
     }
     ?>
@@ -104,6 +161,22 @@ $vendors = get_users(array('role__in' => array('author', 'seller'))); //Get only
     ?>
 </div>
 
+<div id="ActiveProducts" class="tabcontent" style="display: block;">
+    <h3>Active</h3>
+    <?php
+    $all_product_data = $wpdb->get_results("SELECT ID,post_title,post_content,post_author,post_date_gmt FROM `" . $wpdb->prefix . "posts` where post_type='product' and post_status = 'publish'");
+    foreach ($all_product_data as $produto) {
+        $url = get_permalink($produto->ID);
+        if (my_units_sold_count($produto->ID)) {
+    ?>
+            <p><a href="<?php echo $url ?>" target="_blank"><?php echo esc_html($produto->post_title) ?></a> -> ATIVO <br></p>
+    <?php
+        }
+    }
+    ?>
+</div>
+
+
 <div id="Inactive" class="tabcontent">
     <h3>Inactive</h3>
     <?php
@@ -119,9 +192,22 @@ $vendors = get_users(array('role__in' => array('author', 'seller'))); //Get only
     ?>
 
 </div>
-<?php
-list_products()
-?>
+
+<div id="InactiveProducts" class="tabcontent">
+    <h3>Inactive</h3>
+    <?php
+    $all_product_data = $wpdb->get_results("SELECT ID,post_title,post_content,post_author,post_date_gmt FROM `" . $wpdb->prefix . "posts` where post_type='product' and post_status = 'publish'");
+    foreach ($all_product_data as $produto) {
+        $url = get_permalink($produto->ID);
+        if (!my_units_sold_count($produto->ID)) {
+    ?>
+            <p><a href="<?php echo $url ?>" target="_blank"><?php echo esc_html($produto->post_title) ?></a> -> INATIVO <br></p>
+    <?php
+        }
+    }
+    ?>
+</div>
+
 <?php
 
 
@@ -141,26 +227,8 @@ function has_product($user_id)
     return false;
 }
 
-
-add_action('woocommerce_single_product_summary', 'wc_product_sold_count', 11);
-function wc_product_sold_count()
+function my_units_sold_count($id)
 {
-    global $product;
-    $units_sold = get_post_meta($product->id, 'total_sales', true);
-    //echo '<p>' . sprintf(__('Units Sold: %s', 'woocommerce'), $units_sold) . '</p>';
-}
-
-function list_products()
-{
-    $product_query = dokan()->product->all();
-    var_dump($product_query);
-}
-
-//add_action('woocommerce_single_product_summary', 'wp_product_sold_count', 11);
-function wp_product_sold_count()
-{
-    global $product;
-    $total_sold = get_post_meta($product->get_id(), 'total_sales', true);
-    if ($total_sold)
-        echo '' . sprintf(__('Total Sold: %s', 'woocommerce'), $total_sold) . '';
+    $units_sold = get_post_meta($id, 'total_sales', true);
+    return $units_sold;
 }
